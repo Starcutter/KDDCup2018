@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[2]:
+# In[3]:
 
 
 import pandas as pd
@@ -9,7 +9,7 @@ import pandas as pd
 
 # # Beijing AQ
 
-# In[3]:
+# In[4]:
 
 
 df1 = pd.read_csv('data/beijing_201802_201803_aq.csv')
@@ -27,7 +27,7 @@ beijing_aq = beijing_aq.rename(columns={"stationId": "station_id"})
 
 # # London AQ
 
-# In[4]:
+# In[5]:
 
 
 df1 = pd.read_csv('data/London_historical_aqi_forecast_stations_20180331.csv', index_col=0)
@@ -43,13 +43,13 @@ london_aq["utc_time"] = pd.to_datetime(london_aq["utc_time"])
 
 # # Beijing grid meteorology
 
-# In[5]:
+# In[6]:
 
 
 df = pd.read_csv("data/Beijing_historical_meo_grid.csv")
 
 
-# In[6]:
+# In[7]:
 
 
 beijing_meo = df.rename(columns={
@@ -62,13 +62,13 @@ beijing_meo["time"] = pd.to_datetime(beijing_meo["time"])
 
 # # London grid meteorology
 
-# In[7]:
+# In[8]:
 
 
 df = pd.read_csv("data/London_historical_meo_grid.csv")
 
 
-# In[8]:
+# In[9]:
 
 
 london_meo = df.rename(columns={
@@ -81,7 +81,7 @@ london_meo["time"] = pd.to_datetime(london_meo["time"])
 
 # # APIs
 
-# In[39]:
+# In[12]:
 
 
 import requests
@@ -99,6 +99,9 @@ def buildDataFrame(text):
         tmp[i] = tmp[i].split(",")
     df = pd.DataFrame(tmp[1: ], columns=tmp[0])
     return df
+
+
+# In[13]:
 
 
 def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
@@ -149,6 +152,9 @@ def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     return df
 
 
+# In[40]:
+
+
 def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
                         end=pd.Timestamp("2018-04-01 23:00:00")):
     target = ["station_id", "time", "temperature", "pressure",
@@ -156,6 +162,7 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     mid = pd.Timestamp("2018-04-01 00:00:00")
     df1 = pd.DataFrame()
     df2 = pd.DataFrame()
+    df3 = pd.DataFrame()
     if end >= mid:
         if (start >= mid):
             s = start
@@ -179,11 +186,22 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
         except:
             pass
     df = pd.concat([df2, df1])
+    now = df["time"].iloc[-1]
+    if now < end:
+        s = now - pd.Timedelta(1, unit="h")
+        url = "http://kdd.caiyunapp.com/competition/forecast/%s/%d-%d-%d-%d/2k0d1d8" % (city, s.year, s.month, s.day, s.hour)
+        response = requests.get(url)
+        df3 = buildDataFrame(response.text)
+        df3 = df3.rename(columns={"forecast_time": "time"})
+        df3["time"] = pd.to_datetime(df3["time"])
+        df3 = df3[df3["time"] > now]
+        try:
+            df3 = df3[target]
+        except:
+            pass
+    df = pd.concat([df, df3])
     df = df.reset_index(drop=True)
     if df.empty:
         df = pd.DataFrame()
     return df
-
-# airQualityData("ld", 2017, 4, 26, 2)
-airQualityData("bj", pd.Timestamp("2018-03-20 00:00:00"), pd.Timestamp("2018-04-01 23:00:00"))
 
