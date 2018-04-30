@@ -27,7 +27,7 @@ beijing_aq = beijing_aq.rename(columns={"stationId": "station_id"})
 
 # # London AQ
 
-# In[48]:
+# In[4]:
 
 
 df1 = pd.read_csv('data/London_historical_aqi_forecast_stations_20180331.csv', index_col=0)
@@ -43,13 +43,13 @@ london_aq["utc_time"] = pd.to_datetime(london_aq["utc_time"])
 
 # # Beijing grid meteorology
 
-# In[68]:
+# In[5]:
 
 
 df = pd.read_csv("data/Beijing_historical_meo_grid.csv")
 
 
-# In[71]:
+# In[6]:
 
 
 beijing_meo = df.rename(columns={
@@ -62,13 +62,13 @@ beijing_meo["time"] = pd.to_datetime(beijing_meo["time"])
 
 # # London grid meteorology
 
-# In[63]:
+# In[7]:
 
 
 df = pd.read_csv("data/London_historical_meo_grid.csv")
 
 
-# In[66]:
+# In[8]:
 
 
 london_meo = df.rename(columns={
@@ -81,7 +81,7 @@ london_meo["time"] = pd.to_datetime(london_meo["time"])
 
 # # APIs
 
-# In[103]:
+# In[39]:
 
 
 import requests
@@ -101,7 +101,8 @@ def buildDataFrame(text):
     return df
 
 
-def airQualityData(city="bj", year=2018, month=5, day=1, hour=0):
+def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
+                        end=pd.Timestamp("2018-04-01 23:00:00")):
     if city == "bj":
         target = ["station_id", "time", "PM2.5", "PM10", "O3"]
     else:
@@ -114,70 +115,75 @@ def airQualityData(city="bj", year=2018, month=5, day=1, hour=0):
         "PM2.5 (ug/m3)": "PM2.5",
         "utc_time": "time",
     }
-    if year == 2018 and month >= 4:
-        url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, year, month, day, hour, year, month, day, hour)
+    mid = pd.Timestamp("2018-04-01 00:00:00")
+    df1 = pd.DataFrame()
+    df2 = pd.DataFrame()
+    if end >= mid:
+        if (start >= mid):
+            s = start
+        else:
+            s = mid
+        url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, s.year, s.month, s.day, s.hour, end.year, end.month, end.day, end.hour)
         response = requests.get(url)
-        df = buildDataFrame(response.text)
+        df1 = buildDataFrame(response.text)
         try:
-            df["time"] = pd.to_datetime(df["time"])
+            df1 = df1.rename(columns=dic)
+            df1["time"] = pd.to_datetime(df1["time"])
+            df1 = df1[target]
         except:
             pass
-    else:
-        time = pd.Timestamp("%d-%d-%d %d:00:00" % (year, month, day, hour))
+    if start < mid:
         if city == "bj":
-            df = beijing_aq[beijing_aq["utc_time"] == time]
+            df2 = beijing_aq[(start <= beijing_aq["utc_time"]) & (beijing_aq["utc_time"] <= end)]
         else:
-            df = london_aq[london_aq["utc_time"] == time]
-        df = df.reset_index()
-    
-    df = df.rename(columns=dic)
-    try:
-        df = df[target]
-    except:
-        pass
-    if df.empty:
-        df = pd.DataFrame()
-    return df
-
-
-def meteorologyGridData(city="bj", year=2018, month=5, day=1, hour=0):
-    target = ["station_id", "time", "temperature", "pressure",
-              "humidity", "wind_direction", "wind_speed"]
-    url = 'https://biendata.com/competition/meteorology/%s_grid/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, year, month, day, hour, year, month, day, hour)
-    if year == 2018 and month >= 4:
-        response = requests.get(url)
-        df = buildDataFrame(response.text)
+            df2 = london_aq[(start <= london_aq["utc_time"]) & (london_aq["utc_time"] <= end)]
+        df2 = df2.rename(columns=dic)
         try:
-            df["time"] = pd.to_datetime(df["time"])
+            df2 = df2[target]
         except:
             pass
-    else:
-        time = pd.Timestamp("%d-%d-%d %d:00:00" % (year, month, day, hour))
-        if city == "bj":
-            df = beijing_meo[beijing_meo["time"] == time]
-        else:
-            df = london_meo[london_meo["time"] == time]
-    try:
-        df = df[target]
-    except:
-        pass
+    df = pd.concat([df2, df1])
     df = df.reset_index(drop=True)
     if df.empty:
         df = pd.DataFrame()
     return df
 
 
-def observedMeteorology(city="bj", year=2018, month=5, day=1, hour=0):
-    if city != "bj":
-        print("No observed meteorology data for London!!!!")
-        return
-    url = 'https://biendata.com/competition/meteorology/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, year, month, day, hour, year, month, day, hour)
-    response = requests.get(url)
-    df = buildDataFrame(response.text)
+def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
+                        end=pd.Timestamp("2018-04-01 23:00:00")):
+    target = ["station_id", "time", "temperature", "pressure",
+              "humidity", "wind_direction", "wind_speed"]
+    mid = pd.Timestamp("2018-04-01 00:00:00")
+    df1 = pd.DataFrame()
+    df2 = pd.DataFrame()
+    if end >= mid:
+        if (start >= mid):
+            s = start
+        else:
+            s = mid
+        url = 'https://biendata.com/competition/meteorology/%s_grid/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, s.year, s.month, s.day, s.hour, end.year, end.month, end.day, end.hour)
+        response = requests.get(url)
+        df1 = buildDataFrame(response.text)
+        try:
+            df1["time"] = pd.to_datetime(df1["time"])
+            df1 = df1[target]
+        except:
+            pass
+    if start < mid:
+        if city == "bj":
+            df2 = beijing_meo[(start <= beijing_meo["time"]) & (beijing_meo["time"] <= end)]
+        else:
+            df2 = london_meo[(start <= london_meo["time"]) & (london_meo["time"] <= end)]
+        try:
+            df2 = df2[target]
+        except:
+            pass
+    df = pd.concat([df2, df1])
+    df = df.reset_index(drop=True)
     if df.empty:
         df = pd.DataFrame()
     return df
 
 # airQualityData("ld", 2017, 4, 26, 2)
-meteorologyGridData("ld", 2018, 4, 26, 2)
+airQualityData("bj", pd.Timestamp("2018-03-20 00:00:00"), pd.Timestamp("2018-04-01 23:00:00"))
 
