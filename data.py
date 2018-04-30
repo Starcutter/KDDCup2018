@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[3]:
+# In[6]:
 
 
 import pandas as pd
@@ -9,7 +9,7 @@ import pandas as pd
 
 # # Beijing AQ
 
-# In[4]:
+# In[7]:
 
 
 df1 = pd.read_csv('data/beijing_201802_201803_aq.csv')
@@ -27,7 +27,7 @@ beijing_aq = beijing_aq.rename(columns={"stationId": "station_id"})
 
 # # London AQ
 
-# In[5]:
+# In[8]:
 
 
 df1 = pd.read_csv('data/London_historical_aqi_forecast_stations_20180331.csv', index_col=0)
@@ -43,13 +43,13 @@ london_aq["utc_time"] = pd.to_datetime(london_aq["utc_time"])
 
 # # Beijing grid meteorology
 
-# In[6]:
+# In[9]:
 
 
 df = pd.read_csv("data/Beijing_historical_meo_grid.csv")
 
 
-# In[7]:
+# In[10]:
 
 
 beijing_meo = df.rename(columns={
@@ -62,13 +62,13 @@ beijing_meo["time"] = pd.to_datetime(beijing_meo["time"])
 
 # # London grid meteorology
 
-# In[8]:
+# In[11]:
 
 
 df = pd.read_csv("data/London_historical_meo_grid.csv")
 
 
-# In[9]:
+# In[12]:
 
 
 london_meo = df.rename(columns={
@@ -81,27 +81,20 @@ london_meo["time"] = pd.to_datetime(london_meo["time"])
 
 # # APIs
 
-# In[12]:
+# In[13]:
 
 
 import requests
+from io import StringIO
 
 
 def buildDataFrame(text):
-    if len(text) < 10:
-        return pd.DataFrame()
-    tmp = text.split("\n")
-    if (tmp[-1] == ""):
-        tmp = tmp[: -1]
-    for i in range(0, len(tmp)):
-        if tmp[i][-1] == "\r":
-            tmp[i] = tmp[i][: -1]
-        tmp[i] = tmp[i].split(",")
-    df = pd.DataFrame(tmp[1: ], columns=tmp[0])
+    text = StringIO(text)
+    df = pd.read_csv(text)
     return df
 
 
-# In[13]:
+# In[24]:
 
 
 def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
@@ -129,10 +122,13 @@ def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
         url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, s.year, s.month, s.day, s.hour, end.year, end.month, end.day, end.hour)
         response = requests.get(url)
         df1 = buildDataFrame(response.text)
+        df1 = df1.rename(columns=dic)
         try:
-            df1 = df1.rename(columns=dic)
-            df1["time"] = pd.to_datetime(df1["time"])
             df1 = df1[target]
+        except:
+            pass
+        try:
+            df1["time"] = pd.to_datetime(df1["time"])
         except:
             pass
     if start < mid:
@@ -152,7 +148,7 @@ def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     return df
 
 
-# In[40]:
+# In[23]:
 
 
 def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
@@ -172,8 +168,11 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
         response = requests.get(url)
         df1 = buildDataFrame(response.text)
         try:
-            df1["time"] = pd.to_datetime(df1["time"])
             df1 = df1[target]
+        except:
+            pass
+        try:
+            df1["time"] = pd.to_datetime(df1["time"])
         except:
             pass
     if start < mid:
