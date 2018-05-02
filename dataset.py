@@ -5,6 +5,7 @@
 
 
 import os
+os.chdir("../")
 from torch.utils.data import Dataset, DataLoader
 from data import *
 import pandas as pd
@@ -13,7 +14,7 @@ import datetime
 from collections import namedtuple
 
 
-# In[7]:
+# In[4]:
 
 
 KddData = namedtuple('KddData', ['aq', 'meo', 'meo_pred', 'y'], verbose=True)
@@ -34,6 +35,12 @@ class KddDataset(Dataset):
         self.meo = self.addMissingData(self.meo, self.start, self.end, self.grids)
 
     def __init__(self, city="bj", T=7, T_future=2):
+        if city == "bj":
+            self.w = 31
+            self.h = 21
+        else:
+            self.w = 41
+            self.h = 21
         print("loading data in %s" % city)
         self.city = city
         self.T = T
@@ -127,15 +134,16 @@ class KddDataset(Dataset):
         return (self.end - self.start).days + 1 - 2
 
     def __getitem__(self, idx):
-        aq = self.aq.values[idx * len(self.stations) * 24: (idx + self.T) * len(self.stations) * 24].reshape(-1)
-        meo = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(-1)
-        meo_pred = self.meo.values[(idx + self.T) * len(self.grids) * 24:                                    (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(-1)
-        y = self.aq.values[(idx + self.T) * len(self.stations) * 24:                                    (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(-1)
+        aq = self.aq.values[idx * len(self.stations) * 24: (idx + self.T) * len(self.stations) * 24].reshape(self.T * 24, len(self.stations), -1)
+        meo = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(self.T * 24, self.w, self.h, -1)
+        meo_pred = self.meo.values[(idx + self.T) * len(self.grids) * 24:                                    (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
+        y = self.aq.values[(idx + self.T) * len(self.stations) * 24:                                    (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
         return KddData(aq, meo, meo_pred, y)
 
 if __name__ == "__main__":
-    dataset = KddDataset("bj")
+    dataset = KddDataset("ld")
     r = dataset[0]
     aq, meo, meo_pred, y = r
     print(aq.shape, meo.shape, meo_pred.shape, y.shape)
+    print(aq)
 
