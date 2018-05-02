@@ -1,15 +1,30 @@
 
 # coding: utf-8
 
-# In[6]:
+# In[1]:
 
 
+import os
 import pandas as pd
+import datetime
+
+
+# In[2]:
+
+
+if not os.path.exists("./data/api"):
+    os.mkdir("./data/api")
+    os.mkdir("./data/api/bj")
+    os.mkdir("./data/api/bj/aq")
+    os.mkdir("./data/api/bj/meo")
+    os.mkdir("./data/api/ld")
+    os.mkdir("./data/api/ld/aq")
+    os.mkdir("./data/api/ld/meo")
 
 
 # # Beijing AQ
 
-# In[7]:
+# In[3]:
 
 
 df1 = pd.read_csv('data/beijing_201802_201803_aq.csv')
@@ -27,7 +42,7 @@ beijing_aq = beijing_aq.rename(columns={"stationId": "station_id"})
 
 # # London AQ
 
-# In[8]:
+# In[4]:
 
 
 df1 = pd.read_csv('data/London_historical_aqi_forecast_stations_20180331.csv', index_col=0)
@@ -43,13 +58,13 @@ london_aq["utc_time"] = pd.to_datetime(london_aq["utc_time"])
 
 # # Beijing grid meteorology
 
-# In[9]:
+# In[5]:
 
 
 df = pd.read_csv("data/Beijing_historical_meo_grid.csv")
 
 
-# In[10]:
+# In[6]:
 
 
 beijing_meo = df.rename(columns={
@@ -62,13 +77,13 @@ beijing_meo["time"] = pd.to_datetime(beijing_meo["time"])
 
 # # London grid meteorology
 
-# In[11]:
+# In[7]:
 
 
 df = pd.read_csv("data/London_historical_meo_grid.csv")
 
 
-# In[12]:
+# In[8]:
 
 
 london_meo = df.rename(columns={
@@ -81,7 +96,7 @@ london_meo["time"] = pd.to_datetime(london_meo["time"])
 
 # # APIs
 
-# In[13]:
+# In[9]:
 
 
 import requests
@@ -94,11 +109,22 @@ def buildDataFrame(text):
     return df
 
 
-# In[24]:
+# In[26]:
 
 
 def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
                         end=pd.Timestamp("2018-04-01 23:00:00")):
+    now = pd.Timestamp(datetime.datetime.utcnow().date())
+    i = pd.Timestamp("2018-04-01")
+    while i < now:
+        filename = "./data/api/%s/aq/%d-%d.csv" % (city, i.month, i.day)
+        if not os.path.exists(filename):
+            e = i + pd.Timedelta(1, unit="d")
+            url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, i.year, i.month, i.day, i.hour, e.year, e.month, e.day, e.hour)
+            response = requests.get(url)
+            df = buildDataFrame(response.text)
+            df.to_csv(filename, index=None)
+        i += pd.Timedelta(1, unit="d")
     if city == "bj":
         target = ["station_id", "time", "PM2.5", "PM10", "O3"]
     else:
@@ -115,14 +141,20 @@ def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     df1 = pd.DataFrame()
     df2 = pd.DataFrame()
     if end >= mid:
-        if (start >= mid):
-            s = start
-        else:
-            s = mid
-        url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, s.year, s.month, s.day, s.hour, end.year, end.month, end.day, end.hour)
-        response = requests.get(url)
-        df1 = buildDataFrame(response.text)
+        i = pd.Timestamp("2018-04-01")
+        while i < now:
+            tmp = pd.read_csv("./data/api/%s/aq/%d-%d.csv" % (city, i.month, i.day))
+            tmp["time"] = pd.to_datetime(tmp["time"])
+            df1 = pd.concat([df1, tmp])
+            i += pd.Timedelta(1, unit="d")
+        if end >= now:
+            url = 'https://biendata.com/competition/airquality/%s/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, now.year, now.month, now.day, now.hour, end.year, end.month, end.day, end.hour)
+            response = requests.get(url)
+            tmp = buildDataFrame(response.text)
+            tmp["time"] = pd.to_datetime(tmp["time"])
+            df1 = pd.concat([df1, tmp])
         df1 = df1.rename(columns=dic)
+        df1 = df1[(df1.time >= start) & (df1.time <= end)]
         try:
             df1 = df1[target]
         except:
@@ -148,11 +180,22 @@ def airQualityData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     return df
 
 
-# In[23]:
+# In[41]:
 
 
 def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
                         end=pd.Timestamp("2018-04-01 23:00:00")):
+    now = pd.Timestamp(datetime.datetime.utcnow().date())
+    i = pd.Timestamp("2018-04-01")
+    while i < now:
+        filename = "./data/api/%s/meo/%d-%d.csv" % (city, i.month, i.day)
+        if not os.path.exists(filename):
+            e = i + pd.Timedelta(1, unit="d")
+            url = 'https://biendata.com/competition/meteorology/%s_grid/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, i.year, i.month, i.day, i.hour, e.year, e.month, e.day, e.hour)
+            response = requests.get(url)
+            df = buildDataFrame(response.text)
+            df.to_csv(filename, index=None)
+        i += pd.Timedelta(1, unit="d")
     target = ["station_id", "time", "temperature", "pressure",
               "humidity", "wind_direction", "wind_speed"]
     mid = pd.Timestamp("2018-04-01 00:00:00")
@@ -160,13 +203,19 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     df2 = pd.DataFrame()
     df3 = pd.DataFrame()
     if end >= mid:
-        if (start >= mid):
-            s = start
-        else:
-            s = mid
-        url = 'https://biendata.com/competition/meteorology/%s_grid/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, s.year, s.month, s.day, s.hour, end.year, end.month, end.day, end.hour)
-        response = requests.get(url)
-        df1 = buildDataFrame(response.text)
+        i = pd.Timestamp("2018-04-01")
+        while i < now:
+            tmp = pd.read_csv("./data/api/%s/meo/%d-%d.csv" % (city, i.month, i.day))
+            tmp["time"] = pd.to_datetime(tmp["time"])
+            df1 = pd.concat([df1, tmp])
+            i += pd.Timedelta(1, unit="d")
+        if end >= now:
+            url = 'https://biendata.com/competition/meteorology/%s_grid/%d-%d-%d-%d/%d-%d-%d-%d/2k0d1d8' % (city, now.year, now.month, now.day, now.hour, end.year, end.month, end.day, end.hour)
+            response = requests.get(url)
+            tmp = buildDataFrame(response.text)
+            tmp["time"] = pd.to_datetime(tmp["time"])
+            df1 = pd.concat([df1, tmp])
+        df1 = df1[(df1.time >= start) & (df1.time <= end)]
         try:
             df1 = df1[target]
         except:
