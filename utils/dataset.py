@@ -38,7 +38,7 @@ class KddDataset(Dataset):
         self.meo = self.addMissingData(
             self.meo, self.start, self.end, self.grids)
 
-    def __init__(self, city="bj", T=7, T_future=2):
+    def __init__(self, city="bj", T=2, T_future=1):
         if city == "bj":
             self.w = 31
             self.h = 21
@@ -144,6 +144,10 @@ class KddDataset(Dataset):
         meo = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(self.T * 24, self.w, self.h, -1)
         meo_pred = self.meo.values[(idx + self.T) * len(self.grids) * 24: (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
         y = self.aq.values[(idx + self.T) * len(self.stations) * 24: (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
+        aq = np.reshape(aq, (self.T * 24, -1)).astype(np.float32)
+        meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
+        meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
+        y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
 
 
