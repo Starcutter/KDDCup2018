@@ -147,13 +147,33 @@ class KddDataset(Dataset):
         return KddData(aq, meo, meo_pred, y)
 
 
+class Subset(torch.utils.data.Dataset):
+    def __init__(self, dataset, indices):
+        self.dataset = dataset
+        self.indices = indices
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        return self.dataset[self.indices[idx]]
+
+
+def random_split(dataset, lengths):
+    lengths = [length * len(dataset) // sum(lengths) for length in lengths]
+    lengths[-1] += len(dataset) - sum(lengths)
+    indices = torch.randperm(len(dataset))
+    return [Subset(dataset, indices[sum(lengths[:i]):sum(lengths[:i + 1])])
+            for i in range(len(lengths))]
+
+
 if __name__ == "__main__":
     city = 'bj'
     save_path = f'data/dataset_{city}.pt'
     if os.path.exists(save_path):
         dataset = torch.load(open(save_path, 'rb'))
     else:
-        from data import *
+        from utils.data import *
         dataset = KddDataset(city)
         torch.save(dataset, open(save_path, 'wb'))
     r = dataset[0]

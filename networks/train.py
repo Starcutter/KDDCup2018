@@ -3,41 +3,11 @@ import torch
 import numpy as np
 from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
+from tensorboardX import SummaryWriter
 from networks import torch_utils, basic_networks
 from networks.conv_lstm_cell import ConvLSTMCell
-from tensorboardX import SummaryWriter
-
-
-class KddDataset(Dataset):
-    def __init__(self):
-        # TODO xrz
-        raise NotImplementedError
-
-    def __len__(self):
-        raise NotImplementedError
-
-    def __getitem__(self, idx):
-        raise NotImplementedError
-
-
-class Subset(torch.utils.data.Dataset):
-    def __init__(self, dataset, indices):
-        self.dataset = dataset
-        self.indices = indices
-
-    def __len__(self):
-        return len(self.indices)
-
-    def __getitem__(self, idx):
-        return self.dataset[self.indices[idx]]
-
-
-def random_split(dataset, lengths):
-    lengths = [length * len(dataset) // sum(lengths) for length in lengths]
-    lengths[-1] += len(dataset) - sum(lengths)
-    indices = torch.randperm(len(dataset))
-    return [Subset(dataset, indices[sum(lengths[:i]):sum(lengths[:i + 1])])
-            for i in range(len(lengths))]
+from utils.dataset import KddDataset, random_split
+from utils.eval import smape
 
 
 if __name__ == "__main__":
@@ -67,8 +37,8 @@ if __name__ == "__main__":
     fusion = basic_networks.NNList([
         torch_utils.Flatten(),
         basic_networks.FC(
-            input_dim=  # TODO concat output size of aq_lst, me_lstm and grid_lstm
-            output_dim=  # TODO size of y
+            input_dim=# TODO concat output size of aq_lst, me_lstm and grid_lstm
+            output_dim=# TODO size of y
             hidden_dims=[HIDDEN_SIZE],
         ),
     ])
@@ -89,11 +59,6 @@ if __name__ == "__main__":
     writer = SummaryWriter()
     PLOT_EVERY = 10
 
-    def smape(actual, predicted):
-        dividend= np.abs(np.array(actual) - np.array(predicted))
-        denominator = np.array(actual) + np.array(predicted)
-        return 2 * np.mean(np.divide(dividend, denominator, out=np.zeros_like(dividend), where=denominator!=0, casting='unsafe'))
-
     def run_batch(sample):
         aq, me, me_grid, y = sample[0].cuda(), sample[1].cuda(
         ), sample[2].cuda(), sample[3].cuda()
@@ -107,7 +72,7 @@ if __name__ == "__main__":
         y_hat = fusion(...)
         loss = loss_fn(y_hat, y)
 
-        smape =  smape(y, y_hat)
+        smape = smape(y, y_hat)
         return loss, smape
 
     for epoch in range(MAX_EPOCH):
