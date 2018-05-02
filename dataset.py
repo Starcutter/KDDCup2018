@@ -10,10 +10,13 @@ from data import *
 import pandas as pd
 import numpy as np
 import datetime
+from collections import namedtuple
 
 
-# In[42]:
+# In[7]:
 
+
+KddData = namedtuple('KddData', ['aq', 'meo', 'meo_pred', 'y'], verbose=True)
 
 class KddDataset(Dataset):
     def addMissingData(self, df, start, end, stations):
@@ -124,15 +127,15 @@ class KddDataset(Dataset):
         return (self.end - self.start).days + 1 - 2
 
     def __getitem__(self, idx):
-        result = {}
-        result["aq"] = self.aq.values[idx * len(self.stations) * 24: (idx + self.T) * len(self.stations) * 24].reshape(-1)
-        result["meo"] = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(-1)
-        result["meo_pred"] = self.meo.values[(idx + self.T) * len(self.grids) * 24:                                              (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(-1)
-        result["result"] = self.aq.values[(idx + self.T) * len(self.stations) * 24:                                           (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(-1)
-        return result
+        aq = self.aq.values[idx * len(self.stations) * 24: (idx + self.T) * len(self.stations) * 24].reshape(-1)
+        meo = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(-1)
+        meo_pred = self.meo.values[(idx + self.T) * len(self.grids) * 24:                                    (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(-1)
+        y = self.aq.values[(idx + self.T) * len(self.stations) * 24:                                    (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(-1)
+        return KddData(aq, meo, meo_pred, y)
 
 if __name__ == "__main__":
     dataset = KddDataset("bj")
     r = dataset[0]
-    print(r["aq"].shape, r["meo"].shape, r["meo_pred"].shape, r["result"].shape)
+    aq, meo, meo_pred, y = r
+    print(aq.shape, meo.shape, meo_pred.shape, y.shape)
 

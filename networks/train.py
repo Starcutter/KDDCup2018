@@ -89,6 +89,11 @@ if __name__ == "__main__":
     writer = SummaryWriter()
     PLOT_EVERY = 10
 
+    def smape(actual, predicted):
+        dividend= np.abs(np.array(actual) - np.array(predicted))
+        denominator = np.array(actual) + np.array(predicted)
+        return 2 * np.mean(np.divide(dividend, denominator, out=np.zeros_like(dividend), where=denominator!=0, casting='unsafe'))
+
     def run_batch(sample):
         aq, me, me_grid, y = sample[0].cuda(), sample[1].cuda(
         ), sample[2].cuda(), sample[3].cuda()
@@ -102,9 +107,7 @@ if __name__ == "__main__":
         y_hat = fusion(...)
         loss = loss_fn(y_hat, y)
 
-        smape =  # xrz can caculate our SMAPE score and
-        # thus we can have a plot of it during training.
-        # maybe we can find code on the forum
+        smape =  smape(y, y_hat)
         return loss, smape
 
     for epoch in range(MAX_EPOCH):
