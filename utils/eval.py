@@ -1,12 +1,14 @@
 import numpy as np
-import os
-os.chdir("../")
-from data import *
+
 
 def SMAPE(actual, predicted):
     dividend = np.abs(np.array(actual) - np.array(predicted))
     denominator = np.array(actual) + np.array(predicted)
-    return 2 * np.mean(np.divide(dividend, denominator, out=np.zeros_like(dividend), where=denominator != 0, casting='unsafe'))
+    smape = np.divide(dividend, denominator, out=np.zeros_like(
+        dividend), where=denominator != 0, casting='unsafe')
+    nan_mask = np.isnan(smape)
+    return 2 * np.mean(smape[~nan_mask])
+
 
 def eval(start_date, pred_file):
     bj_stations = [
@@ -62,12 +64,15 @@ def eval(start_date, pred_file):
         'GN3'
     ]
     date_to_eval = pd.Timestamp(start_date)
-    bj_df = airQualityData('bj', date_to_eval, date_to_eval + pd.Timedelta(47, unit='h'))
-    ld_df = airQualityData('ld', date_to_eval, date_to_eval + pd.Timedelta(47, unit='h'))
+    bj_df = airQualityData(
+        'bj', date_to_eval, date_to_eval + pd.Timedelta(47, unit='h'))
+    ld_df = airQualityData(
+        'ld', date_to_eval, date_to_eval + pd.Timedelta(47, unit='h'))
 
     truth_df = pd.DataFrame()
     for station in bj_stations:
-        station_df = bj_df[bj_df['station_id'] == station].drop_duplicates(['time'])
+        station_df = bj_df[bj_df['station_id']
+                           == station].drop_duplicates(['time'])
         dt = date_to_eval
         for i in range(48):
             if len(station_df[station_df['time'] == dt]) == 0:
@@ -79,7 +84,8 @@ def eval(start_date, pred_file):
         truth_df = pd.concat([truth_df, station_df])
 
     for station in ld_stations:
-        station_df = ld_df[ld_df['station_id'] == station].drop_duplicates(['time'])
+        station_df = ld_df[ld_df['station_id']
+                           == station].drop_duplicates(['time'])
         station_df['O3'] = 0.0
         dt = date_to_eval
         for i in range(48):
@@ -96,7 +102,8 @@ def eval(start_date, pred_file):
     submit_df = pd.read_csv(pred_file).fillna(0.0)
     submit_matrix = submit_df.drop(columns=['test_id'], axis=1).as_matrix()
 
-    truth_matrix = truth_df.drop(columns=['station_id', 'time'], axis=1).as_matrix().astype(np.float64)
+    truth_matrix = truth_df.drop(
+        columns=['station_id', 'time'], axis=1).as_matrix().astype(np.float64)
 
     nan_lines = list(set(np.where(np.isnan(truth_matrix))[0]))
     mask = np.array([True] * truth_matrix.shape[0])
@@ -109,7 +116,5 @@ def eval(start_date, pred_file):
 
 
 if __name__ == '__main__':
+    from utils.data import *
     print(eval('2018-05-01', 'results/submit_0501.csv'))
-
-
-

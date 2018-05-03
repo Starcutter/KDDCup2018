@@ -20,7 +20,7 @@ if __name__ == "__main__":
     HIDDEN_SIZE = 32
     NUM_LAYERS = 1
     LEARNING_RATE = 1e-4
-    MAX_EPOCH = 400
+    MAX_EPOCH = 1000
 
     dataset = torch.load('data/dataset_bj.pt')
     train_set, validation_set, test_set = random_split(dataset, [3, 1, 1])
@@ -36,20 +36,20 @@ if __name__ == "__main__":
     fusion = basic_networks.NNList([
         torch_utils.Flatten(),
         basic_networks.FC(
-            input_dim=T * HIDDEN_SIZE + HIDDEN_SIZE * H * W,
+            input_dim=HIDDEN_SIZE + HIDDEN_SIZE * H * W,
             output_dim=T_PRED * AQ_SIZE,
-            hidden_dims=[HIDDEN_SIZE],
+            hidden_dims=[],
         ),
     ])
 
-    print('Run on multiple gpus')
+    # print('Run on multiple gpus')
     aq_lstm = aq_lstm.cuda()
-    me_lstm = nn.DataParallel(me_lstm).cuda()
+    me_lstm = me_lstm.cuda()
     fusion = fusion.cuda()
     models = [aq_lstm, me_lstm, fusion]
 
     print('Create a criterion and optimizer')
-    loss_fn = nn.MSELoss(reduce=False)
+    loss_fn = nn.MSELoss()  # reduce=False)
     optimizer = optim.Adam(
         [params for model in models for params in model.parameters()], lr=LEARNING_RATE)
 
@@ -62,11 +62,16 @@ if __name__ == "__main__":
         aq, me, me_pred, y = sample[0].cuda(), sample[1].cuda(
         ), sample[2].cuda(), sample[3].cuda()
         me = torch.cat([me, me_pred], dim=1)
+        # TODO this is not elegant
+        aq[torch.isnan(aq)] = 0
+        me[torch.isnan(me)] = 0
+        ori_y = y.clone()
+        y[torch.isnan(y)] = 0
 
         hidden = (Variable(torch.zeros(NUM_LAYERS, B, HIDDEN_SIZE)).cuda(),
                   Variable(torch.zeros(NUM_LAYERS, B, HIDDEN_SIZE)).cuda())
         aq_state = aq_lstm(aq, hidden)
-        aq_feature = aq_state[0].contiguous().view(B, -1)
+        aq_feature = aq_state[0][:, -1]
 
         me_state = None
         for t in range(T):
@@ -74,13 +79,14 @@ if __name__ == "__main__":
         me_feature = me_state[0].view(B, -1)
 
         # compute predicted value
-        y_hat = fusion(torch.cat([aq_feature, me_feature], dim=1)).view(B, T_PRED, AQ_SIZE)
+        # y_hat = fusion(aq_feature)
+        y_hat = fusion(torch.cat([aq_feature, me_feature], dim=1))
+        y_hat = y_hat.view(B, T_PRED, AQ_SIZE)
         loss = loss_fn(y_hat, y)
-        mask = torch.isnan(loss)
-        loss[mask] = 0
-        loss = torch.sum(loss) / int(np.prod(loss.shape) - torch.sum(mask))
+        # nan_mask = torch.isnan(loss)
+        # loss = torch.mean(loss[~nan_mask])
 
-        smape = SMAPE(y.data, y_hat.data)
+        smape = SMAPE(ori_y.data, y_hat.data)
         return loss, smape
 
     for epoch in range(MAX_EPOCH):
@@ -95,9 +101,13 @@ if __name__ == "__main__":
 
             # compute new grad parameters through time!
             loss.backward()
-            for model in models:
-                for param in model.parameters():
-                    param.grad[torch.isnan(param.grad)] = 0
+            # for model in models:
+                # for param in model.parameters():
+                    # if param.grad is None:
+                        # continue
+                    # print(int(torch.sum(torch.isnan(param.grad))))
+                    # print(int(torch.sum(torch.isnan(param.grad))) / int(np.prod(param.grad.shape)))
+                    # param.grad[torch.isnan(param.grad)] = 0
 
             # learning_rate step against the gradient
             optimizer.step()
@@ -108,7 +118,8 @@ if __name__ == "__main__":
 
             validation_loss, validation_smape = \
                 run_batch(iter(validation_loader).next())
-            print(' > Epoch {:2d} validation loss: {:.3f}'.format(epoch, validation_loss.data[0]))
+            print(' > Epoch {:2d} validation loss: {:.3f}'.format(
+                epoch, validation_loss.data[0]))
             writer.add_scalar('validation_loss',
                               validation_loss, epoch)
             writer.add_scalar('validation_SMAPE',
