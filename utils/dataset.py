@@ -134,11 +134,11 @@ class KddDataset(Dataset):
         self.aq = self.aq.drop(columns=["time", "station_id"])
         self.meo = self.meo.drop(columns=["time", "station_id"])
         print("load successfully!")
+        self.aq = self.aq.values
+        self.meo = self.meo.values
         self._normalize()
 
     def _normalize(self):
-        self.aq = self.aq.values
-        self.meo = self.meo.values
         self.aq_mean = np.nanmean(self.aq, axis=0)
         self.aq_std = np.nanstd(self.aq, axis=0)
         self.aq -= self.aq_mean
@@ -149,7 +149,7 @@ class KddDataset(Dataset):
         self.meo /= self.meo_std
 
     def __len__(self):
-        return (self.end - self.start).days + 1 - self.T_future
+        return (self.end - self.start).days + 1 - self.T_future - self.T + 1
 
     def __getitem__(self, idx):
 
