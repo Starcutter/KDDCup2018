@@ -134,16 +134,33 @@ class KddDataset(Dataset):
         self.aq = self.aq.drop(columns=["time", "station_id"])
         self.meo = self.meo.drop(columns=["time", "station_id"])
         print("load successfully!")
+        self._normalize()
+
+    def _normalize(self):
+        self.aq = self.aq.values
+        self.meo = self.meo.values
+        self.aq_mean = np.nanmean(self.aq, axis=0)
+        self.aq_std = np.nanstd(self.aq, axis=0)
+        self.aq -= self.aq_mean
+        self.aq /= self.aq_std
+        self.meo_mean = np.nanmean(self.meo, axis=0)
+        self.meo_std = np.nanstd(self.meo, axis=0)
+        self.meo -= self.meo_mean
+        self.meo /= self.meo_std
 
     def __len__(self):
         return (self.end - self.start).days + 1 - 2
 
     def __getitem__(self, idx):
 
-        aq = self.aq.values[idx * len(self.stations) * 24: (idx + self.T) * len(self.stations) * 24].reshape(self.T * 24, len(self.stations), -1)
-        meo = self.meo.values[idx * len(self.grids) * 24: (idx + self.T) * len(self.grids) * 24].reshape(self.T * 24, self.w, self.h, -1)
-        meo_pred = self.meo.values[(idx + self.T) * len(self.grids) * 24: (idx + self.T + self.T_future) * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
-        y = self.aq.values[(idx + self.T) * len(self.stations) * 24: (idx + self.T + self.T_future) * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
+        aq = self.aq[idx * len(self.stations) * 24: (idx + self.T) * len(
+            self.stations) * 24].reshape(self.T * 24, len(self.stations), -1)
+        meo = self.meo[idx * len(self.grids) * 24: (idx + self.T) * len(
+            self.grids) * 24].reshape(self.T * 24, self.w, self.h, -1)
+        meo_pred = self.meo[(idx + self.T) * len(self.grids) * 24: (idx + self.T + self.T_future)
+                            * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
+        y = self.aq[(idx + self.T) * len(self.stations) * 24: (idx + self.T + self.T_future)
+                    * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
         aq = np.reshape(aq, (self.T * 24, -1)).astype(np.float32)
         meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
         meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
@@ -183,4 +200,3 @@ if __name__ == "__main__":
     r = dataset[0]
     aq, meo, meo_pred, y = r
     print(aq.shape, meo.shape, meo_pred.shape, y.shape)
-

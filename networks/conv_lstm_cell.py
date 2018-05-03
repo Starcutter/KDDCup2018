@@ -5,7 +5,7 @@ from torch.autograd import Variable
 
 
 # Define some constants
-KERNEL_SIZE = 3
+KERNEL_SIZE = 7
 PADDING = KERNEL_SIZE // 2
 
 
