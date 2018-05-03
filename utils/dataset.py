@@ -39,7 +39,7 @@ class KddDataset(Dataset):
         self.meo = self.addMissingData(
             self.meo, self.start, self.end, self.grids)
 
-    def __init__(self, city="bj", T=2, T_future=1):
+    def __init__(self, city="bj", T=2, T_future=2):
         if city == "bj":
             self.w = 31
             self.h = 21
@@ -101,7 +101,7 @@ class KddDataset(Dataset):
                 self.grids.append("beijing_grid_" + tmp)
         else:
             self.aq = airQualityData("ld", self.start, self.end)
-            self.aq["O3"] = float("nan")
+            # self.aq["O3"] = float("nan")
             self.meo = meteorologyGridData("ld", self.start, self.end)
             self.stations = [
                 'CD1',
@@ -169,6 +169,8 @@ class KddDataset(Dataset):
 
 
 class StationInvariantKddDataset(KddDataset):
+    def __init__(self, city):
+        super().__init__(city)
 
     def __len__(self):
         return len(self.stations) * super().__len__()
@@ -199,14 +201,16 @@ def random_split(dataset, lengths):
 
 
 if __name__ == "__main__":
-    city = 'bj'
-    save_path = f'data/dataset_{city}.pt'
-    if os.path.exists(save_path):
-        dataset = torch.load(open(save_path, 'rb'))
+    save_path_bj = f'data/dataset_bj.pt'
+    save_path_ld = f'data/dataset_ld.pt'
+    if os.path.exists(save_path_bj) and os.path.exists(save_path_ld):
+        pass
     else:
         from utils.data import *
-        dataset = StationInvariantKddDataset(city)
-        torch.save(dataset, open(save_path, 'wb'))
-    r = dataset[0]
-    aq, meo, meo_pred, y = r
-    print(aq.shape, meo.shape, meo_pred.shape, y.shape)
+        if not os.path.exists(save_path_bj):
+            dataset = StationInvariantKddDataset("bj")
+            torch.save(dataset, open(save_path_bj, 'wb'))
+        if not os.path.exists(save_path_ld):
+            dataset = StationInvariantKddDataset("ld")
+            torch.save(dataset, open(save_path_ld, 'wb'))
+    print("Two datasets are saved successfully!")
