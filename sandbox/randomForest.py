@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
 from utils.dataset import StationInvariantKddDataset
 from utils.eval import SMAPE
 
@@ -28,7 +29,18 @@ test_x = np.nan_to_num(test_x)
 print('Size of train, validation: {}, {}'.format(train_x.shape, test_x.shape))
 
 model = RandomForestRegressor()
-model.fit(train_x, train_y)
+
+param_grid = {"n_estimators": [10, 200],
+    "max_features": ['auto', 30, 80],
+    "min_samples_split": [2, 5, 10],
+    "min_samples_leaf": [1, 3, 10],
+    "bootstrap": [True, False]
+}
+
+grid = GridSearchCV(estimator=model, param_grid=param_grid, n_jobs=-1)
+grid.fit(train_x, train_y)
+print(grid.best_score_)
+print(grid.best_params_)
 
 
 def eval(model, x, y):
@@ -39,5 +51,5 @@ def eval(model, x, y):
                  y * dataset.aq_std + dataset.aq_mean)
 
 
-print('SMAPE on train set:', eval(model, train_x, train_y_with_nan))
-print('SMAPE on test set:', eval(model, test_x, test_y))
+print('SMAPE on train set:', eval(grid, train_x, train_y_with_nan))
+print('SMAPE on test set:', eval(grid, test_x, test_y))
