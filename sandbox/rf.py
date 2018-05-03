@@ -7,13 +7,17 @@ from utils.dataset import StationInvariantKddDataset
 from utils.eval import SMAPE
 
 
-def getRandomForestModel(city="bj", random_state=0):
+def getRandomForestModel(city="bj", random_state=0, use_pred=True):
     dataset = torch.load(f'data/dataset_{city}.pt')
     dataset.T = 7
 
-    x = np.vstack([np.concatenate([dataset[idx].aq.flatten(),
-                                np.mean(dataset[idx].meo_pred, axis=(2, 3)).flatten()])
-                for idx in range(len(dataset))])
+    if use_pred:
+        x = np.vstack([np.concatenate([dataset[idx].aq.flatten(),
+                                    np.mean(dataset[idx].meo_pred, axis=(2, 3)).flatten()])
+                    for idx in range(len(dataset))])
+    else:
+        x = np.vstack([np.concatenate([dataset[idx].aq.flatten()])
+                    for idx in range(len(dataset))])
     y = np.vstack([np.concatenate([dataset[idx].y.flatten()])
                 for idx in range(len(dataset))])
 
@@ -69,5 +73,6 @@ def getRandomForestModel(city="bj", random_state=0):
 
     return grid
 
-# model_bj = getRandomForestModel("bj", 0)
-# model_ld = getRandomForestModel("ld", 0)
+if __name__ == '__main__':
+    # model_bj = getRandomForestModel("bj", 0)
+    model_ld = getRandomForestModel("ld", 0)

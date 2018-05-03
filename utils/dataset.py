@@ -149,7 +149,7 @@ class KddDataset(Dataset):
         self.meo /= self.meo_std
 
     def __len__(self):
-        return (self.end - self.start).days + 1 - self.T_future - self.T + 1
+        return (self.end - self.start).days + 1 - self.T_future - self.T
 
     def __getitem__(self, idx):
         aq = self.aq[idx * len(self.stations) * 24: (idx + self.T) * len(
