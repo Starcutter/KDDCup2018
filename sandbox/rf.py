@@ -10,7 +10,8 @@ from utils.eval import SMAPE
 dataset = torch.load('data/dataset_bj.pt')
 dataset.T = 7
 
-x = np.vstack([np.concatenate([dataset[idx].aq.flatten()])
+x = np.vstack([np.concatenate([dataset[idx].aq.flatten(),
+                               np.mean(dataset[idx].meo_pred, axis=(2, 3)).flatten()])
                for idx in range(len(dataset))])
 y = np.vstack([np.concatenate([dataset[idx].y.flatten()])
                for idx in range(len(dataset))])
@@ -29,10 +30,10 @@ train_y = np.nan_to_num(train_y)
 test_x = np.nan_to_num(test_x)
 print('Size of train, validation: {}, {}'.format(train_x.shape, test_x.shape))
 
-model = RandomForestRegressor()
+model = RandomForestRegressor(n_jobs=-1)
 
 param_grid = {
-    "n_estimators": [10],
+    "n_estimators": [40],
     "max_features": [96],
     "min_samples_split": [4],
     "min_samples_leaf": [2],
