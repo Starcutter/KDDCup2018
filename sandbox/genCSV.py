@@ -73,7 +73,7 @@ def genCSV(random_state=0):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) > 0:
+    if len(sys.argv) > 1:
         genCSV(int(sys.argv[1]))
     else:
         genCSV(0)
