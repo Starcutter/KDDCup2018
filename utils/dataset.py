@@ -37,7 +37,7 @@ class KddDataset(Dataset):
         self.aq = self.addMissingData(
             self.aq, self.start, self.end, self.stations)
         self.meo = self.addMissingData(
-            self.meo, self.start, self.end, self.grids)
+            self.meo, self.start, self.end + pd.Timedelta(2, unit="d"), self.grids)
 
     def __init__(self, city="bj", T=2, T_future=2):
         if city == "bj":
@@ -51,11 +51,10 @@ class KddDataset(Dataset):
         self.T = T
         self.T_future = T_future
         self.start = pd.Timestamp("2017-01-01 00:00:00")
-        self.end = pd.Timestamp(
-            datetime.datetime.utcnow().date()) - pd.Timedelta(1, unit="h")
+        self.end = pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
         if city == "bj":
             self.aq = airQualityData("bj", self.start, self.end)
-            self.meo = meteorologyGridData("bj", self.start, self.end)
+            self.meo = meteorologyGridData("bj", self.start, self.end + pd.Timedelta(2, unit="d"))
             self.stations = [
                 'aotizhongxin_aq',
                 'badaling_aq',
@@ -134,10 +133,10 @@ class KddDataset(Dataset):
         self.meo = self.meo.reset_index(drop=True)
         self.aq = self.aq.drop(columns=["time", "station_id"])
         self.meo = self.meo.drop(columns=["time", "station_id"])
-        print("load successfully!")
         self.aq = self.aq.values
         self.meo = self.meo.values
         self._normalize()
+        print("load successfully!")
 
     def _normalize(self):
         self.aq_mean = np.nanmean(self.aq, axis=0)
@@ -167,6 +166,18 @@ class KddDataset(Dataset):
         # y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
 
+    def getLatestData(self):
+        idx = (self.end + pd.Timedelta(2, unit="d") - self.start).days * 24 \
+            + (self.end - self.start).seconds // 3600 - (self.T + self.T_future) * 24 + 1
+        aq = self.aq[idx * len(self.stations): (idx + self.T * 24) * len(
+            self.stations)].reshape(self.T * 24, len(self.stations), -1)
+        meo = self.meo[idx * len(self.grids): (idx + self.T * 24) * len(
+            self.grids)].reshape(self.T * 24, self.w, self.h, -1)
+        meo_pred = self.meo[(idx + self.T * 24) * len(self.grids): (idx + (self.T + self.T_future) * 24)
+                            * len(self.grids)].reshape(self.T_future * 24, self.w, self.h, -1)
+        meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
+        meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
+        return KddData(aq, meo, meo_pred, None)
 
 class StationInvariantKddDataset(KddDataset):
     def __init__(self, city):
@@ -179,6 +190,9 @@ class StationInvariantKddDataset(KddDataset):
         aq, meo, meo_pred, y = super().__getitem__(idx // len(self.stations))
         return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
 
+    def getLatestData(self, idx):
+        aq, meo, meo_pred, y = super().getLatestData()
+        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, None)
 
 class Subset(torch.utils.data.Dataset):
     def __init__(self, dataset, indices):
@@ -208,9 +222,9 @@ if __name__ == "__main__":
     else:
         from utils.data import *
         if not os.path.exists(save_path_bj):
-            dataset = StationInvariantKddDataset("bj")
-            torch.save(dataset, open(save_path_bj, 'wb'))
+            dataset_bj = StationInvariantKddDataset("bj")
+            torch.save(dataset_bj, open(save_path_bj, 'wb'))
         if not os.path.exists(save_path_ld):
-            dataset = StationInvariantKddDataset("ld")
-            torch.save(dataset, open(save_path_ld, 'wb'))
-    print("Two datasets are saved successfully!")
+            dataset_ld = StationInvariantKddDataset("ld")
+            torch.save(dataset_ld, open(save_path_ld, 'wb'))
+    print("Two datasets have been saved successfully!")

@@ -245,7 +245,7 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
         except:
             pass
     df = pd.concat([df2, df1])
-    now = df["time"].iloc[-1]
+    now = pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
     if now < end:
         s = now - pd.Timedelta(1, unit="h")
         url = "http://kdd.caiyunapp.com/competition/forecast/%s/%d-%d-%d-%d/2k0d1d8" % (
@@ -253,12 +253,12 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
         response = requests.get(url)
         df3 = buildDataFrame(response.text)
         df3 = df3.rename(columns={"forecast_time": "time"})
-        df3["time"] = pd.to_datetime(df3["time"])
-        df3 = df3[df3["time"] > now]
         try:
+            df3["time"] = pd.to_datetime(df3["time"])
+            df3 = df3[df3["time"] > now]
             df3 = df3[target]
         except:
-            pass
+            df3 = pd.DataFrame()
     df = pd.concat([df, df3])
     df = df.reset_index(drop=True)
     if df.empty:
