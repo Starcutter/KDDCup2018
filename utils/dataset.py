@@ -21,6 +21,7 @@ KddData = namedtuple('KddData', ['aq', 'meo', 'meo_pred', 'y'])
 
 
 class KddDataset(Dataset):
+
     def addMissingData(self, df, start, end, stations):
         df = df.drop_duplicates(["time", "station_id"])
         df.set_index(['time', 'station_id'], inplace=True)
@@ -152,7 +153,6 @@ class KddDataset(Dataset):
         return (self.end - self.start).days + 1 - self.T_future - self.T + 1
 
     def __getitem__(self, idx):
-
         aq = self.aq[idx * len(self.stations) * 24: (idx + self.T) * len(
             self.stations) * 24].reshape(self.T * 24, len(self.stations), -1)
         meo = self.meo[idx * len(self.grids) * 24: (idx + self.T) * len(
@@ -161,11 +161,21 @@ class KddDataset(Dataset):
                             * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
         y = self.aq[(idx + self.T) * len(self.stations) * 24: (idx + self.T + self.T_future)
                     * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
-        aq = np.reshape(aq, (self.T * 24, -1)).astype(np.float32)
+        # aq = np.reshape(aq, (self.T * 24, -1)).astype(np.float32)
         meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
         meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
-        y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
+        # y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
+
+
+class StationInvariantKddDataset(KddDataset):
+
+    def __len__(self):
+        return len(self.stations) * super().__len__()
+
+    def __getitem__(self, idx):
+        aq, meo, meo_pred, y = super().__getitem__(idx // len(self.stations))
+        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
 
 
 class Subset(torch.utils.data.Dataset):
@@ -195,7 +205,7 @@ if __name__ == "__main__":
         dataset = torch.load(open(save_path, 'rb'))
     else:
         from utils.data import *
-        dataset = KddDataset(city)
+        dataset = StationInvariantKddDataset(city)
         torch.save(dataset, open(save_path, 'wb'))
     r = dataset[0]
     aq, meo, meo_pred, y = r
