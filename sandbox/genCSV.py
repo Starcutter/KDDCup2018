@@ -78,4 +78,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         genCSV(int(sys.argv[1]))
     else:
-        genCSV(0, pd.Timestamp("2018-04-30 23:00:00"))
+        genCSV(0)

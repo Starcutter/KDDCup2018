@@ -3,7 +3,7 @@ import pandas as pd
 import datetime
 import os
 
-date_to_forc = pd.Timestamp(datetime.datetime.utcnow().date()) + pd.Timedelta(1, unit='d')
+date_to_forc = pd.Timestamp(datetime.datetime.utcnow().date())
 m_d_str = date_to_forc.strftime('%m%d')
 
 files = os.listdir('results/')
