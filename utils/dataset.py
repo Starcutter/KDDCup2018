@@ -158,20 +158,23 @@ class KddDataset(Dataset):
         # y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
 
-    def get_latest_data(self, date):
-        date += pd.Timedelta(2, unit="d")
-        idx = (date - self.start).days * 24 \
-            + (date - self.start).seconds // 3600 - \
-              (self.T + self.T_future) * 24 + 1
+    def get_data(self, date):
+        idx = (date - self.start).days * 24 + \
+            (date - self.start).seconds // 3600 - self.T * 24 + 1
         aq = self.aq[idx * len(self.stations): (idx + self.T * 24) * len(
             self.stations)].reshape(self.T * 24, len(self.stations), -1)
         meo = self.meo[idx * len(self.grids): (idx + self.T * 24) * len(
             self.grids)].reshape(self.T * 24, self.w, self.h, -1)
         meo_pred = self.meo[(idx + self.T * 24) * len(self.grids): (idx + (self.T + self.T_future) * 24)
                             * len(self.grids)].reshape(self.T_future * 24, self.w, self.h, -1)
+        try:
+            y = self.aq[(idx + self.T * 24) * len(self.stations): (idx + (self.T + self.T_future) * 24)
+                        * len(self.stations)].reshape(self.T_future * 24, len(self.stations), -1)
+        except:
+            y = None
         meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
         meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
-        return KddData(aq, meo, meo_pred, None)
+        return KddData(aq, meo, meo_pred, y)
 
 
 class StationInvariantKddDataset(KddDataset):
@@ -185,15 +188,21 @@ class StationInvariantKddDataset(KddDataset):
         aq, meo, meo_pred, y = super().__getitem__(idx // len(self.stations))
         return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
 
-    def get_latest_data(self, idx, date=pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))):
-        aq, meo, meo_pred, y = super().get_latest_data(date)
-        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, None)
+    def get_latest_data(self, idx):
+        date = pd.Timestamp(
+            datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
+        aq, meo, meo_pred, y = super().get_data(date)
+        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y)
+
+    def get_data(self, idx, date):
+        aq, meo, meo_pred, y = super().get_data(date)
+        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y)
 
 
 class Subset(torch.utils.data.Dataset):
     def __init__(self, dataset, indices):
-        self.dataset=dataset
-        self.indices=indices
+        self.dataset = dataset
+        self.indices = indices
 
     def __len__(self):
         return len(self.indices)
@@ -203,9 +212,9 @@ class Subset(torch.utils.data.Dataset):
 
 
 def random_split(dataset, lengths):
-    lengths=[length * len(dataset) // sum(lengths) for length in lengths]
+    lengths = [length * len(dataset) // sum(lengths) for length in lengths]
     lengths[-1] += len(dataset) - sum(lengths)
-    indices=torch.randperm(len(dataset))
+    indices = torch.randperm(len(dataset))
     return [Subset(dataset, indices[sum(lengths[:i]):sum(lengths[:i + 1])])
             for i in range(len(lengths))]
 
