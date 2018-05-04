@@ -167,11 +167,14 @@ class KddDataset(Dataset):
             self.grids)].reshape(self.T * 24, self.w, self.h, -1)
         meo_pred = self.meo[(idx + self.T * 24) * len(self.grids): (idx + (self.T + self.T_future) * 24)
                             * len(self.grids)].reshape(self.T_future * 24, self.w, self.h, -1)
-        try:
-            y = self.aq[(idx + self.T * 24) * len(self.stations): (idx + (self.T + self.T_future) * 24)
-                        * len(self.stations)].reshape(self.T_future * 24, len(self.stations), -1)
-        except:
-            y = None
+        y = self.aq[(idx + self.T * 24) * len(self.stations): (idx + (self.T + self.T_future) * 24)
+                    * len(self.stations)]
+        delta = self.T_future * 24 * len(self.stations) - y.shape[0]
+        if delta > 0:
+            a = np.empty((delta, y.shape[1]))
+            a[:, :] = np.nan
+            y = np.vstack([y, a])
+        y = y.reshape(self.T_future * 24, len(self.stations), -1)
         meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
         meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
@@ -196,7 +199,7 @@ class StationInvariantKddDataset(KddDataset):
 
     def get_data(self, idx, date):
         aq, meo, meo_pred, y = super().get_data(date)
-        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y)
+        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
 
 
 class Subset(torch.utils.data.Dataset):
