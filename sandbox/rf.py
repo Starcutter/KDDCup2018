@@ -5,9 +5,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 from utils.dataset import StationInvariantKddDataset
 from utils.eval import SMAPE
+import pandas as pd
 
 
-def getRandomForestModel(city="bj", random_state=0, use_pred=True):
+def getRandomForestModel(date, city="bj", random_state=0, use_pred=True):
     dataset = torch.load(f'data/dataset_{city}.pt')
     dataset.T = 7
 
@@ -23,6 +24,9 @@ def getRandomForestModel(city="bj", random_state=0, use_pred=True):
 
     # x.shape: (485 days * 35 stations, T * 24 hours * 3 index)
     # y.shape: (485 days * 35 stations, 24 hours * 3 index)
+    print("len = ", len(dataset))
+    x = x[: len(dataset.stations) * ((date - pd.Timestamp("2017-01-01")).days - dataset.T_future - dataset.T + 1)]
+    y = y[: len(dataset.stations) * ((date - pd.Timestamp("2017-01-01")).days - dataset.T_future - dataset.T + 1)]
     print(x.shape, y.shape)
 
     train_x, test_x, train_y, test_y = train_test_split(

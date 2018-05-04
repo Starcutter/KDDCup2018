@@ -15,22 +15,22 @@ import sys
 # In[28]:
 
 
-def getDataFrame(city, random_state=0, use_pred=True):
+def getDataFrame(city, date, random_state=0, use_pred=True):
     dataset = torch.load(f'data/dataset_{city}.pt')
     print(len(dataset))
     dataset.T = 7
     stations = dataset.stations
-    
+
     x = np.vstack(
         [np.concatenate(
-            [dataset.get_latest_data(idx).aq.flatten(),
-             np.mean(dataset.get_latest_data(idx).meo_pred, axis=(2, 3)).flatten()]
+            [dataset.get_data(idx, date).aq.flatten(),
+             np.mean(dataset.get_data(idx, date).meo_pred, axis=(2, 3)).flatten()]
         )]
         for idx in range(len(stations)))
     print(x.shape)
     x = np.nan_to_num(x)
-    
-    model = getRandomForestModel(city, random_state, use_pred)
+
+    model = getRandomForestModel(date, city, random_state, use_pred)
     y_hat = model.predict(x)
     y_hat = y_hat.reshape(y_hat.shape[0], 24 * 2, -1)
     y_hat = y_hat * dataset.aq_std + dataset.aq_mean
@@ -40,35 +40,37 @@ def getDataFrame(city, random_state=0, use_pred=True):
     metrics = ['PM2.5', 'PM10']
     if city == 'bj':
         metrics.append('O3')
-    
+
     y_hat = y_hat.reshape((numStations * 48, numFeatures))
     y_hat[y_hat < 0] = 0
-    
+
     df = pd.DataFrame(y_hat, columns=metrics)
-    df.insert(0, 'test_id', [station + '#' + str(i) for station in stations for i in range(48)])
-    
+    df.insert(0, 'test_id', [station + '#' + str(i)
+                             for station in stations for i in range(48)])
+
     return df
 
 
 # In[31]:
 
 
-date_to_forc = pd.Timestamp(datetime.datetime.utcnow().date()) + pd.Timedelta(1, unit='d')
+date_to_forc = pd.Timestamp(
+    datetime.datetime.utcnow().date()) + pd.Timedelta(1, unit='d')
 m_d_str = date_to_forc.strftime('%m%d')
 
 
 # In[34]:
 
 
-def genCSV(random_state=0):
-    bj_df = getDataFrame('bj', random_state)
-    ld_df = getDataFrame('ld', random_state)
+def genCSV(random_state=0, date=pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))):
+    bj_df = getDataFrame('bj', date, random_state)
+    ld_df = getDataFrame('ld', date, random_state)
 
     df = pd.concat([bj_df, ld_df])
     submission = df.reindex(columns=['test_id', 'PM2.5', 'PM10', 'O3'])
     submission = submission.reset_index(drop=True)
 
-    filename = 'results/submit_'+m_d_str+'_'+str(random_state)+'.csv'
+    filename = 'results/submit_' + date.strftime('%m%d%H%M') + '_' + str(random_state) + '.csv'
     submission.to_csv(filename, index=None)
 
 
@@ -76,5 +78,4 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         genCSV(int(sys.argv[1]))
     else:
-        genCSV(0)
-
+        genCSV(0, pd.Timestamp("2018-04-30 23:00:00"))
