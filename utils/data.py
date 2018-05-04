@@ -247,7 +247,7 @@ def meteorologyGridData(city="bj", start=pd.Timestamp("2018-04-01 00:00:00"),
     df = pd.concat([df2, df1])
     now = pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
     if now < end:
-        s = now - pd.Timedelta(1, unit="h")
+        s = now
         while s > now - pd.Timedelta(2, unit="d"):
             url = "http://kdd.caiyunapp.com/competition/forecast/%s/%d-%d-%d-%d/2k0d1d8" % (
                 city, s.year, s.month, s.day, s.hour)
