@@ -23,8 +23,8 @@ def getDataFrame(city, random_state=0, use_pred=True):
     
     x = np.vstack(
         [np.concatenate(
-            [dataset.getLatestData(idx).aq.flatten(),
-             np.mean(dataset.getLatestData(idx).meo_pred, axis=(2, 3)).flatten()]
+            [dataset.get_latest_data(idx).aq.flatten(),
+             np.mean(dataset.get_latest_data(idx).meo_pred, axis=(2, 3)).flatten()]
         )]
         for idx in range(len(stations)))
     print(x.shape)

@@ -1,20 +1,10 @@
-
-# coding: utf-8
-
-# In[1]:
-
-
 import os
-
 import pandas as pd
 import numpy as np
 import datetime
 import torch
 from torch.utils.data import Dataset, DataLoader
 from collections import namedtuple
-
-
-# In[4]:
 
 
 KddData = namedtuple('KddData', ['aq', 'meo', 'meo_pred', 'y'])
@@ -51,10 +41,12 @@ class KddDataset(Dataset):
         self.T = T
         self.T_future = T_future
         self.start = pd.Timestamp("2017-01-01 00:00:00")
-        self.end = pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
+        self.end = pd.Timestamp(
+            datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
         if city == "bj":
             self.aq = airQualityData("bj", self.start, self.end)
-            self.meo = meteorologyGridData("bj", self.start, self.end + pd.Timedelta(2, unit="d"))
+            self.meo = meteorologyGridData(
+                "bj", self.start, self.end + pd.Timedelta(2, unit="d"))
             self.stations = [
                 'aotizhongxin_aq',
                 'badaling_aq',
@@ -166,9 +158,11 @@ class KddDataset(Dataset):
         # y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
         return KddData(aq, meo, meo_pred, y)
 
-    def getLatestData(self):
-        idx = (self.end + pd.Timedelta(2, unit="d") - self.start).days * 24 \
-            + (self.end - self.start).seconds // 3600 - (self.T + self.T_future) * 24 + 1
+    def get_latest_data(self, date):
+        date += pd.Timedelta(2, unit="d")
+        idx = (date - self.start).days * 24 \
+            + (date - self.start).seconds // 3600 - \
+              (self.T + self.T_future) * 24 + 1
         aq = self.aq[idx * len(self.stations): (idx + self.T * 24) * len(
             self.stations)].reshape(self.T * 24, len(self.stations), -1)
         meo = self.meo[idx * len(self.grids): (idx + self.T * 24) * len(
@@ -178,6 +172,7 @@ class KddDataset(Dataset):
         meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
         meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
         return KddData(aq, meo, meo_pred, None)
+
 
 class StationInvariantKddDataset(KddDataset):
     def __init__(self, city):
@@ -190,14 +185,15 @@ class StationInvariantKddDataset(KddDataset):
         aq, meo, meo_pred, y = super().__getitem__(idx // len(self.stations))
         return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
 
-    def getLatestData(self, idx):
-        aq, meo, meo_pred, y = super().getLatestData()
+    def get_latest_data(self, idx, date=pd.Timestamp(datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))):
+        aq, meo, meo_pred, y = super().get_latest_data(date)
         return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, None)
+
 
 class Subset(torch.utils.data.Dataset):
     def __init__(self, dataset, indices):
-        self.dataset = dataset
-        self.indices = indices
+        self.dataset=dataset
+        self.indices=indices
 
     def __len__(self):
         return len(self.indices)
@@ -207,9 +203,9 @@ class Subset(torch.utils.data.Dataset):
 
 
 def random_split(dataset, lengths):
-    lengths = [length * len(dataset) // sum(lengths) for length in lengths]
+    lengths=[length * len(dataset) // sum(lengths) for length in lengths]
     lengths[-1] += len(dataset) - sum(lengths)
-    indices = torch.randperm(len(dataset))
+    indices=torch.randperm(len(dataset))
     return [Subset(dataset, indices[sum(lengths[:i]):sum(lengths[:i + 1])])
             for i in range(len(lengths))]
 
