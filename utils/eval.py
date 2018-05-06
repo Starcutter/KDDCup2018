@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 import pandas as pd
-from utils.dataset import StationInvariantKddDataset
 
 
 def SMAPE(actual, predicted):
@@ -22,14 +21,14 @@ def eval(start_date, pred_file):
     date_to_eval = pd.Timestamp(start_date)
 
     truth_bj = np.vstack([dataset_bj.get_data(idx, date_to_eval - pd.Timedelta(1, unit='h')).y
-        for idx in range(len(bj_stations))])
+                          for idx in range(len(bj_stations))])
 
     truth_bj = truth_bj.reshape(len(bj_stations), -1, 3)
     truth_bj = truth_bj * dataset_bj.aq_std + dataset_bj.aq_mean
     truth_bj = truth_bj.reshape(-1, 3)
 
     truth_ld = np.vstack([dataset_ld.get_data(idx, date_to_eval - pd.Timedelta(1, unit='h')).y
-        for idx in range(len(ld_stations))])
+                          for idx in range(len(ld_stations))])
 
     truth_ld = truth_ld.reshape(len(ld_stations), -1, 2)
     truth_ld = truth_ld * dataset_ld.aq_std + dataset_ld.aq_mean

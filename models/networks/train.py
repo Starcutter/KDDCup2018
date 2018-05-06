@@ -5,8 +5,8 @@ from torch import nn, optim
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
-from networks import torch_utils, basic_networks
-from networks.conv_lstm_cell import ConvLSTMCell
+from models.networks import torch_utils, basic_networks
+from models.networks.conv_lstm_cell import ConvLSTMCell
 from utils.dataset import KddDataset, random_split
 from utils.eval import SMAPE
 

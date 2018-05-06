@@ -2,14 +2,16 @@
 
 |folders|contents|
 |---|---|
-|sandbox|尝试进行的对数据的观察学习以及实验等，主要是 jupyter notebooks。|
-|data|训练数据以及提交样例|
-|networks|神经网络初步模型|
+|sandbox|尝试进行的对数据的观察学习以及实验等|
+|data|训练数据|
+|utils|通用函数|
+|models|各种模型|
+|results|提交结果|
 
 ### 自动预测，生成CSV:
 
 ```
-python sandbox/genCSV.py <random_state>
+python utils/gen_csv.py <random_state>
 ```
 
 `<random_state>`为可选参数，整形，随机种子。不填则默认为0.
@@ -19,7 +21,5 @@ python sandbox/genCSV.py <random_state>
 ### 自动提交当天的所有文件
 
 ```
-python sandbox/submitAll.py
+python utils/all_submit.py
 ```
-
-在`result/`下按照文件名中的日期搜索文件，并提交。

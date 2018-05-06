@@ -1,6 +1,6 @@
 import torch.nn.functional as F
 from torch import nn
-from networks import torch_utils
+from models.networks import torch_utils
 
 import torch
 

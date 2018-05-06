@@ -2,15 +2,17 @@ import os
 import pandas as pd
 import numpy as np
 import datetime
-import torch
-from torch.utils.data import Dataset, DataLoader
+import config
+import pickle
 from collections import namedtuple
+from utils.transform import date_to_idx, flatten_first_2_dimensions
 
 
-KddData = namedtuple('KddData', ['aq', 'meo', 'meo_pred', 'y'])
+AqMeo = namedtuple('AqMeo', ['aq', 'meo'])
+AqMeoPredY = namedtuple('AqMeoPredY', ['aq', 'meo', 'meo_pred', 'y'])
 
 
-class KddDataset(Dataset):
+class Dataset(object):
 
     def addMissingData(self, df, start, end, stations):
         df = df.drop_duplicates(["time", "station_id"])
@@ -29,21 +31,16 @@ class KddDataset(Dataset):
         self.meo = self.addMissingData(
             self.meo, self.start, self.end + pd.Timedelta(2, unit="d"), self.grids)
 
-    def __init__(self, city="bj", T=2, T_future=2):
-        if city == "bj":
-            self.w = 31
-            self.h = 21
-        else:
-            self.w = 41
-            self.h = 21
-        print("loading data in %s" % city)
-        self.city = city
-        self.T = T
-        self.T_future = T_future
+    def __init__(self):
+        print("loading data in %s" % config.CITY)
+        self.w, self.h, self.aq_channels, self.meo_channels = {
+            'bj': (31, 21, 3, 5),
+            'ld': (41, 21, 2, 5)
+        }[config.CITY]
         self.start = pd.Timestamp("2017-01-01 00:00:00")
         self.end = pd.Timestamp(
             datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
-        if city == "bj":
+        if config.CITY == "bj":
             self.aq = airQualityData("bj", self.start, self.end)
             self.meo = meteorologyGridData(
                 "bj", self.start, self.end + pd.Timedelta(2, unit="d"))
@@ -128,6 +125,19 @@ class KddDataset(Dataset):
         self.aq = self.aq.values
         self.meo = self.meo.values
         self._normalize()
+
+        # Will discard the last day if incomplete (before 7:00AM China time)
+        aq_datapoints_per_day = len(self.stations) * 24
+        meo_datapoints_per_day = self.w * self.h * 24
+        self.use_days = self.aq.size // aq_datapoints_per_day // self.aq_channels
+        meo_days = self.meo.size // meo_datapoints_per_day // self.meo_channels
+        self.aq = self.aq[:self.use_days * aq_datapoints_per_day]
+        self.meo = self.meo[:meo_days * meo_datapoints_per_day]
+        self.aq = self.aq.reshape(self.use_days, 24, len(
+            self.stations), self.aq_channels).astype(np.float32)
+        self.meo = self.meo.reshape(
+            meo_days, 24, self.w, self.h, self.meo_channels)
+        self.meo = np.transpose(self.meo, (0, 1, 4, 2, 3)).astype(np.float32)
         print("load successfully!")
 
     def _normalize(self):
@@ -141,68 +151,77 @@ class KddDataset(Dataset):
         self.meo /= self.meo_std
 
     def __len__(self):
-        return (self.end - self.start).days + 1 - self.T_future - self.T
+        return self.use_days
 
     def __getitem__(self, idx):
-        aq = self.aq[idx * len(self.stations) * 24: (idx + self.T) * len(
-            self.stations) * 24].reshape(self.T * 24, len(self.stations), -1)
-        meo = self.meo[idx * len(self.grids) * 24: (idx + self.T) * len(
-            self.grids) * 24].reshape(self.T * 24, self.w, self.h, -1)
-        meo_pred = self.meo[(idx + self.T) * len(self.grids) * 24: (idx + self.T + self.T_future)
-                            * len(self.grids) * 24].reshape(self.T_future * 24, self.w, self.h, -1)
-        y = self.aq[(idx + self.T) * len(self.stations) * 24: (idx + self.T + self.T_future)
-                    * len(self.stations) * 24].reshape(self.T_future * 24, len(self.stations), -1)
-        # aq = np.reshape(aq, (self.T * 24, -1)).astype(np.float32)
-        meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
-        meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
-        # y = np.reshape(y, (self.T_future * 24, -1)).astype(np.float32)
-        return KddData(aq, meo, meo_pred, y)
-
-    def get_data(self, date):
-        idx = (date - self.start).days * 24 + \
-            (date - self.start).seconds // 3600 - self.T * 24 + 1
-        aq = self.aq[idx * len(self.stations): (idx + self.T * 24) * len(
-            self.stations)].reshape(self.T * 24, len(self.stations), -1)
-        meo = self.meo[idx * len(self.grids): (idx + self.T * 24) * len(
-            self.grids)].reshape(self.T * 24, self.w, self.h, -1)
-        meo_pred = self.meo[(idx + self.T * 24) * len(self.grids): (idx + (self.T + self.T_future) * 24)
-                            * len(self.grids)].reshape(self.T_future * 24, self.w, self.h, -1)
-        y = self.aq[(idx + self.T * 24) * len(self.stations): (idx + (self.T + self.T_future) * 24)
-                    * len(self.stations)]
-        delta = self.T_future * 24 * len(self.stations) - y.shape[0]
-        if delta > 0:
-            a = np.empty((delta, y.shape[1]))
-            a[:, :] = np.nan
-            y = np.vstack([y, a])
-        y = y.reshape(self.T_future * 24, len(self.stations), -1)
-        meo = np.transpose(meo, (0, 3, 1, 2)).astype(np.float32)
-        meo_pred = np.transpose(meo_pred, (0, 3, 1, 2)).astype(np.float32)
-        return KddData(aq, meo, meo_pred, y)
+        return AqMeo(self.aq[idx], self.meo[idx])
 
 
-class StationInvariantKddDataset(KddDataset):
-    def __init__(self, city):
-        super().__init__(city)
+class DatasetWrapper(object):
+
+    def __init__(self, dataset):
+        self.dataset = dataset
+        self.stations = self.dataset.stations
 
     def __len__(self):
-        return len(self.stations) * super().__len__()
+        raise NotImplementedError
 
     def __getitem__(self, idx):
-        aq, meo, meo_pred, y = super().__getitem__(idx // len(self.stations))
-        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
-
-    def get_latest_data(self, idx):
-        date = pd.Timestamp(
-            datetime.datetime.utcnow().strftime("%Y-%m-%d %H:00:00"))
-        aq, meo, meo_pred, y = super().get_data(date)
-        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y)
-
-    def get_data(self, idx, date):
-        aq, meo, meo_pred, y = super().get_data(date)
-        return KddData(aq[:, idx % len(self.stations)], meo, meo_pred, y[:, idx % len(self.stations)])
+        raise NotImplementedError
 
 
-class Subset(torch.utils.data.Dataset):
+class EndDateWrapper(DatasetWrapper):
+    '''Note: not including the end date. Should set to TOMORROW to get all.'''
+
+    def __init__(self, dataset, date):
+        super().__init__(dataset)
+        self.end_idx = date_to_idx(date)
+
+    def __len__(self):
+        return min(self.end_idx, len(self.dataset))
+
+    def __getitem__(self, idx):
+        return self.dataset[idx]
+
+
+class PastTDaysWrapper(DatasetWrapper):
+
+    def __len__(self):
+        return len(self.dataset) + 1 - config.PRED_FUTURE_T_DAYS - config.USE_PAST_T_DAYS
+
+    def __getitem__(self, idx):
+        aq, meo = self.dataset[idx: idx + config.USE_PAST_T_DAYS]
+        y, meo_pred = self.dataset[idx + config.USE_PAST_T_DAYS:
+                                   idx + config.USE_PAST_T_DAYS + config.PRED_FUTURE_T_DAYS]
+
+        aq, meo = flatten_first_2_dimensions(
+            aq), flatten_first_2_dimensions(meo)
+        meo_pred, y = flatten_first_2_dimensions(
+            meo_pred), flatten_first_2_dimensions(y)
+        return AqMeoPredY(aq, meo, meo_pred, y)
+
+
+class StationInvariantWrapper(DatasetWrapper):
+
+    def __len__(self):
+        return len(self.dataset.stations) * len(self.dataset)
+
+    def __getitem__(self, idx):
+        aq, meo = self.dataset[idx // len(self.dataset.stations)]
+        return AqMeo(aq[:, idx % len(self.dataset.stations)], meo[:, idx % len(self.dataset.stations)])
+
+
+class StationInvariantPastTDaysWrapper(PastTDaysWrapper):
+
+    def __len__(self):
+        return len(self.dataset.stations) * super().__len__()
+
+    def __getitem__(self, idx):
+        aq, meo, meo_pred, y = super().__getitem__(idx // len(self.dataset.stations))
+        return AqMeoPredY(aq[:, idx % len(self.dataset.stations)], meo, meo_pred, y[:, idx % len(self.dataset.stations)])
+
+
+class Subset(object):
     def __init__(self, dataset, indices):
         self.dataset = dataset
         self.indices = indices
@@ -223,16 +242,15 @@ def random_split(dataset, lengths):
 
 
 if __name__ == "__main__":
-    save_path_bj = f'data/dataset_bj.pt'
-    save_path_ld = f'data/dataset_ld.pt'
-    if os.path.exists(save_path_bj) and os.path.exists(save_path_ld):
-        pass
-    else:
+    for city in ['bj', 'ld']:
+        save_path = f'data/dataset_{city}.pkl'
+        if os.path.exists(save_path):
+            continue
         from utils.data import *
-        if not os.path.exists(save_path_bj):
-            dataset_bj = StationInvariantKddDataset("bj")
-            torch.save(dataset_bj, open(save_path_bj, 'wb'))
-        if not os.path.exists(save_path_ld):
-            dataset_ld = StationInvariantKddDataset("ld")
-            torch.save(dataset_ld, open(save_path_ld, 'wb'))
+        config.CITY = city
+        print(config.CITY)
+        dataset = Dataset()
+        with open(save_path, 'wb') as f:
+            pickle.dump(dataset, f)
+
     print("Two datasets have been saved successfully!")
