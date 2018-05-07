@@ -1,12 +1,14 @@
+import argparse
 import pickle
 import numpy as np
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import GridSearchCV
 import config
 from utils.dataset import Dataset, EndDateWrapper, StationInvariantPastTDaysWrapper
 from utils.eval import SMAPE
-from utils.transform import date_to_idx, flatten_first_2_dimensions
+from utils.transform import date_to_idx, flatten_first_2_dimensions, nan_to_mean
 
 
 class RFModel(object):
@@ -37,10 +39,10 @@ class RFModel(object):
             x, y, test_size=0.2, random_state=config.SEED)
 
         # Keep nan in test_y to avoid calculaing smape on missing values
-        train_x = np.nan_to_num(train_x)
+        train_x = nan_to_mean(train_x)
         train_y_with_nan = train_y
-        train_y = np.nan_to_num(train_y)
-        test_x = np.nan_to_num(test_x)
+        train_y = nan_to_mean(train_y)
+        test_x = nan_to_mean(test_x)
         print('Size of train, validation: {}, {}'.format(
             train_x.shape, test_x.shape))
 
@@ -70,12 +72,15 @@ class RFModel(object):
 
         aq, _ = self.ori_dataset[idx - config.USE_PAST_T_DAYS:idx]
         aq = flatten_first_2_dimensions(aq)
+        # Stations to the 0-dimension
+        aq = np.transpose(aq, (1, 0, 2))
+        # Flatten time and features
+        aq = aq.reshape((aq.shape[0], -1))
         meo_pred = flatten_first_2_dimensions(
             self.ori_dataset.meo[idx:idx + config.PRED_FUTURE_T_DAYS])
-        aq = np.transpose(aq, (1, 0, 2))
-        aq = aq.reshape((aq.shape[0], -1))
         meo_pred = np.mean(meo_pred, axis=(2, 3)).flatten()
-        meo_pred = np.repeat(meo_pred[np.newaxis, :], repeats=aq.shape[0], axis=0)
+        meo_pred = np.repeat(
+            meo_pred[np.newaxis, :], repeats=aq.shape[0], axis=0)
         x = np.concatenate([aq, meo_pred], axis=1)
         x = np.nan_to_num(x)
         y_hat = self.predict(x)
@@ -85,15 +90,20 @@ class RFModel(object):
 
     def eval(self, x, y):
         y_hat = self.predict(x)
-        y = y.reshape(y.shape[0], 24, -1)
-        y_hat = y_hat.reshape(y_hat.shape[0], 24, -1)
+        y = y.reshape(y.shape[0], 24 * config.PRED_FUTURE_T_DAYS, -1)
+        y_hat = y_hat.reshape(
+            y_hat.shape[0], 24 * config.PRED_FUTURE_T_DAYS, -1)
         return SMAPE(y_hat * self.aq_std + self.aq_mean,
                      y * self.aq_std + self.aq_mean)
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--date', type=str,
+                        default=str(config.TRAIN_BEFORE_DATE))
+    args = parser.parse_args()
+
     for city in ['bj', 'ld']:
-        config.CITY = city
-        model = RFModel(city, config.TRAIN_BEFORE_DATE)
+        model = RFModel(city, pd.Timestamp(args.date))
         with open(config.MODEL_SAVED_PATH.format(city), 'wb') as f:
             pickle.dump(model, f)
