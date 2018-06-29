@@ -4,20 +4,28 @@
 
 ##### 左浩佳 徐韧喆 陈齐斌
 
+
+
 ### 1 代码组织结构
 
 - 代码提交、组织结构与运行方法见 Github repo [KDDCup2018](https://github.com/Starcutter/KDDCup2018)
 
+
+
 ### 2 小组成员分工与工作量
 
-| 任务      |     小组成员 |   工作量估计   |
-| :-------: | :--------:| :------: |
-| Data Preprocessing | 徐韧喆、左浩佳 |    |
-| Solution 1 (fbprophet) | 左浩佳 |    |
-| Solution 2 (neural networks) | 陈齐斌 |    |
-| Solution 3 (Random forest regression) | 徐韧喆 |    |
-| Hyperparameter tuning | 左浩佳、陈齐斌 |   |
-| result submission | 左浩佳 |    |
+| 任务      |     小组成员 |
+| :-------: | :--------:|
+| Data Preprocessing | 徐韧喆、左浩佳 |
+| Solution 1 (fbprophet) | 左浩佳 |
+| Solution 2 (neural networks) | 陈齐斌 |
+| Solution 3 (Random forest regression) | 徐韧喆 |
+| Hyperparameter tuning | 左浩佳、陈齐斌 |
+| result submission | 左浩佳 |
+
+三人分工均匀，工作量大致相当，在实验过程中我们尝试了三种不同的模型，每人分别实现了一种。
+
+
 
 ### 3 数据处理和模型构建中所做的尝试
 
@@ -68,12 +76,14 @@ class Dataset(object):
 class PastTDaysWrapper(DatasetWrapper):
 
     def __len__(self):
-        return len(self.dataset) + 1 - config.PRED_FUTURE_T_DAYS - config.USE_PAST_T_DAYS
+        return len(self.dataset) + 1 - config.PRED_FUTURE_T_DAYS -
+               config.USE_PAST_T_DAYS
 
     def __getitem__(self, idx):
         aq, meo = self.dataset[idx: idx + config.USE_PAST_T_DAYS]
         y, meo_pred = self.dataset[idx + config.USE_PAST_T_DAYS:
-                                   idx + config.USE_PAST_T_DAYS + config.PRED_FUTURE_T_DAYS]
+                                   idx + config.USE_PAST_T_DAYS +
+                                   config.PRED_FUTURE_T_DAYS]
 
         aq, meo = flatten_first_2_dimensions(
             aq), flatten_first_2_dimensions(meo)
@@ -114,9 +124,9 @@ class FillNaNsWrapper(DatasetWrapper):
 #### 3.4 Solution 3 (Random forest regression)
 
 - 原理
-  - 略
+  - 随机森林由许多的决策树组成，因为这些决策树的形成采用了随机的方法，所以叫做随机森林。随机森林中的决策树之间是没有关联的，当测试数据进入随机森林时，其实就是让每一颗决策树进行分类看看这个样本应该属于哪一类，最后取所有决策树中分类结果最多的那类为最终的结果（每棵树的权重要考虑进来）。详情可查阅课程ppt6.2.
 - 实现
-	- sklearn.ensemble.RandomForestRegressor
+  - 使用sklearn.ensemble.RandomForestRegressor回归器进行计算，用一个站点历史七天的PM2.5、PM10、O3数据和未来两天的网格预测气象数据的平均值(7 * 24 * 3 + 2 * 24 * 5)预测未来两天的PM2.5、PM10、O3数据(2 * 24 * 3)。
 
 #### 3.5 Hyperparameter tuning 0.5 --> 0.4
 
@@ -131,18 +141,23 @@ class FillNaNsWrapper(DatasetWrapper):
 
 ![grid search | center | 300x0 ](http://otukr87eg.bkt.clouddn.com/f68a5c55d0ee16b4f8c55e7c4f4a0836.jpg)
 
+
+
 ### 4 使用的工具
+
+- python
+  - fbprophet库：用于时间序列预测
+  - pytorch：用于实现神经网络
+  - sklearn中RandomForestRegressor：使用随机森林进行拟合
+
+
 
 ### 5 最终采用的方案
 
-### 6 Results (SMAPE)
+采用方案三随机森林的办法。
 
-报名展示前 (Avg = 0.383)
 
-| 0.33 |  0.34 |  0.40  | 0.40 | 0.38 | 0.38 | 0.37 | 0.42 | 0.40 | 0.41 |
-| --- | --- | --- |
 
-报名展示后 (Avg = 0.814) 注：有一次忘交
+### 6 结果 (SMAPE)
 
-| 0.51 | 0.57 | 0.61 | 2.00 | 0.38 |
-| --- | --- | --- |
+去掉结果最差的5天之后，在官方榜单上，我们的SMAPE结果是0.4646，排名66位。
