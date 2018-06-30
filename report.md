@@ -8,7 +8,18 @@
 
 ### 1 代码组织结构
 
-- 代码提交、组织结构与运行方法见 Github repo [KDDCup2018](https://github.com/Starcutter/KDDCup2018)
+- 代码提交、组织结构与运行方法见 Github repo [KDDCup2018](https://github.com/Starcutter/KDDCup2018)。
+- 代码结构如下：
+  - 根目录
+    - `networks`文件夹，神经网络尝试，详情见后文solution 2.
+    - `sandbox`文件夹
+      - `demo.py`，fbprophet尝试，详情见后文solution 1.
+      - `rf.py`，随机森林尝试，详情见后文solution 3.
+      - `genCSV.py`，生成提交文件。
+    - `utils`文件夹
+      - `data.py`，数据预处理
+      - `dataset.py`，将处理好的数据整合成数据集格式。
+      - `eval.py`，自己实现的SMAPE评估函数。
 
 
 
@@ -131,15 +142,14 @@ class FillNaNsWrapper(DatasetWrapper):
 #### 3.5 Hyperparameter tuning 0.5 --> 0.4
 
 - 超参数
-	- past_n_days: 使用过去几天的空气与气象数据
-	- future_n_days: 使用将来几天的气象预报数据
-	- n_estimators: forest 中 tree 的数量
-	- max_features: 自动选取 feature 的最大数量
-	- min_samples_split, min_samples_leaf, bootstrap …
-
+  - past_n_days: 使用过去几天的空气与气象数据
+  - future_n_days: 使用将来几天的气象预报数据
+  - n_estimators: forest 中 tree 的数量
+  - max_features: 自动选取 feature 的最大数量
+  - min_samples_split, min_samples_leaf, bootstrap …
 - sklearn.model_selection.GridSearchCV
 
-![grid search | center | 300x0 ](http://otukr87eg.bkt.clouddn.com/f68a5c55d0ee16b4f8c55e7c4f4a0836.jpg)
+<img align="center" width="60%" src="http://otukr87eg.bkt.clouddn.com/f68a5c55d0ee16b4f8c55e7c4f4a0836.jpg"></img>
 
 
 
